@@ -4,3 +4,10 @@ server:
 spring:
   lifecycle:
     timeout-per-shutdown-phase: 0s
+  # PostgreSQL Database Configuration
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bms
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  # SQL scripts will be run by DatabaseInitializer (raw JDBC approach)
