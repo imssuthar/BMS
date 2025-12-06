@@ -6,8 +6,28 @@ spring:
     timeout-per-shutdown-phase: 0s
   # PostgreSQL Database Configuration
   datasource:
-    url: jdbc:postgresql://localhost:5432/bms
-    username: postgres
-    password: postgres
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/bms}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
-  # SQL scripts will be run by DatabaseInitializer (raw JDBC approach)
+  # JPA/Hibernate Configuration
+  jpa:
+    hibernate:
+      ddl-auto: update  # Automatically create/update tables from entities
+    show-sql: true       # Show SQL queries in console (for learning)
+    defer-datasource-initialization: true  # Ensures JPA creates tables BEFORE data.sql runs
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  # Initialize data on startup
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:data.sql
+
+# SendGrid Email Configuration
+email:
+  sendgrid:
+    api-key: ${EMAIL_SENDGRID_API_KEY:}  # Use environment variable or set directly
+    from-email: ${EMAIL_SENDGRID_FROM_EMAIL:imssuthar@gmail.com}  # Must be verified in SendGrid

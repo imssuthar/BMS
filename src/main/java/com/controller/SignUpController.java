@@ -1,6 +1,8 @@
 package com.controller;
 
 import com.dto.LoginResponse;
+import com.dto.SignUpRequest;
+import com.service.SignUpI;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -8,16 +10,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.dto.LoginRequest;
-import com.service.LoginI;
-
 @RestController()
-public class LoginController {
+public class SignUpController {
+    
     @Autowired
-    private LoginI loginService;
-    @PostMapping("/login")
-    public ResponseEntity login(@RequestBody @Valid LoginRequest loginRequest) {
-       LoginResponse resp =  loginService.login(loginRequest);
-       return ResponseEntity.status(resp.getStatusCode()).body(resp.getData());
+    private SignUpI signUpService;
+    
+    @PostMapping("/signup")
+    public ResponseEntity<Object> signUp(@RequestBody @Valid SignUpRequest signUpRequest) {
+        LoginResponse resp = signUpService.signUp(signUpRequest);
+        return ResponseEntity.status(resp.getStatusCode()).body(resp.getData());
     }
 }

@@ -16,6 +16,34 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - bms-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bms-app
+    ports:
+      - "8080:8080"
+    environment:
+      # Database connection (use service name instead of localhost)
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bms
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      # SendGrid configuration (use environment variables)
+      EMAIL_SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      EMAIL_SENDGRID_FROM_EMAIL: ${SENDGRID_FROM_EMAIL:-imssuthar@gmail.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - bms-network
+    restart: unless-stopped
+
+networks:
+  bms-network:
+    driver: bridge
 
 volumes:
   postgres_data:

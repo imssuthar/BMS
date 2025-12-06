@@ -1,132 +1,205 @@
-# Docker PostgreSQL Setup Guide
+# Docker Setup Guide for BookMyShow
 
 ## Quick Start
 
-### 1. Start PostgreSQL Container
+### 1. Build and Start All Services
 
 ```bash
-# Start PostgreSQL in Docker
-docker-compose up -d
-
-# Check if container is running
-docker ps
+# Build and start PostgreSQL + Java app
+docker-compose up -d --build
 
 # View logs
-docker-compose logs -f postgres
+docker-compose logs -f app
 ```
 
-### 2. Verify Database is Ready
+### 2. Access the Application
+
+- **Application:** http://localhost:8080
+- **PostgreSQL:** localhost:5432
+
+### 3. Stop Services
 
 ```bash
-# Check container health
-docker-compose ps
+# Stop all services (keeps data)
+docker-compose stop
 
-# Connect to database (optional)
-docker exec -it bms-postgres psql -U postgres -d bms
+# Stop and remove containers (keeps data volume)
+docker-compose down
+
+# Stop and remove everything (including data)
+docker-compose down -v
 ```
-
-### 3. Run Your Application
-
-```bash
-mvn spring-boot:run
-```
-
-The application will automatically:
-- Connect to PostgreSQL in Docker
-- Run `schema.sql` to create tables
-- Run `data.sql` to insert test data
 
 ---
 
 ## Docker Commands
 
-### Start PostgreSQL
+### Build Only
+```bash
+docker-compose build
+```
+
+### Start Services
 ```bash
 docker-compose up -d
 ```
 
-### Stop PostgreSQL (keeps data)
-```bash
-docker-compose stop
-```
-
-### Stop and Remove Container (keeps data volume)
-```bash
-docker-compose down
-```
-
-### Stop and Remove Everything (including data)
-```bash
-docker-compose down -v
-```
-
 ### View Logs
 ```bash
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f app
 docker-compose logs -f postgres
 ```
 
-### Access PostgreSQL CLI
+### Restart Service
 ```bash
-docker exec -it bms-postgres psql -U postgres -d bms
+docker-compose restart app
+```
+
+### Rebuild After Code Changes
+```bash
+docker-compose up -d --build app
 ```
 
 ---
 
-## Database Connection Details
+## Environment Variables
 
-- **Host:** localhost
-- **Port:** 5432
-- **Database:** bms
-- **Username:** postgres
-- **Password:** postgres
+You can override configuration using environment variables:
 
-These match your `application.yml` configuration.
+### Database (in docker-compose.yml)
+- `SPRING_DATASOURCE_URL` - Database connection URL
+- `SPRING_DATASOURCE_USERNAME` - Database username
+- `SPRING_DATASOURCE_PASSWORD` - Database password
+
+### SendGrid (in docker-compose.yml)
+- `EMAIL_SENDGRID_API_KEY` - SendGrid API key
+- `EMAIL_SENDGRID_FROM_EMAIL` - Verified sender email
+
+### Using .env file (Optional)
+
+Create a `.env` file in project root:
+
+```env
+SENDGRID_API_KEY=your-api-key-here
+SENDGRID_FROM_EMAIL=your-email@example.com
+```
+
+Then update `docker-compose.yml` to use:
+```yaml
+EMAIL_SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+EMAIL_SENDGRID_FROM_EMAIL: ${SENDGRID_FROM_EMAIL}
+```
+
+---
+
+## Architecture
+
+```
+┌─────────────────┐
+│   Docker Host   │
+│                 │
+│  ┌───────────┐  │
+│  │   App     │  │  :8080
+│  │ (Java)    │──┼──► http://localhost:8080
+│  └─────┬─────┘  │
+│        │        │
+│        │        │
+│  ┌─────▼─────┐  │
+│  │ PostgreSQL│  │  :5432
+│  │           │──┼──► localhost:5432
+│  └───────────┘  │
+│                 │
+└─────────────────┘
+```
 
 ---
 
 ## Troubleshooting
 
+### App Can't Connect to Database
+- Check if postgres service is healthy: `docker-compose ps`
+- Wait for postgres to be ready: `docker-compose logs postgres`
+- Verify network: Both services should be on `bms-network`
+
 ### Port Already in Use
-If port 5432 is already in use:
-1. Change port in `docker-compose.yml`: `"5433:5432"`
-2. Update `application.yml`: `jdbc:postgresql://localhost:5433/bms`
-
-### Container Won't Start
 ```bash
-# Check logs
-docker-compose logs postgres
+# Check what's using the port
+lsof -i :8080
+lsof -i :5432
 
-# Remove and recreate
-docker-compose down -v
-docker-compose up -d
+# Change ports in docker-compose.yml if needed
 ```
 
-### Data Persistence
-Data is stored in Docker volume `postgres_data`. Even if you remove the container, data persists.
-
-To completely remove data:
+### Rebuild After Code Changes
 ```bash
-docker-compose down -v
+# Rebuild and restart
+docker-compose up -d --build app
 ```
 
----
-
-## Verify Setup
-
-After starting the container, test the connection:
-
+### View Application Logs
 ```bash
-# From your application
-curl -X POST http://localhost:8080/api/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password123"}'
+docker-compose logs -f app
+```
+
+### Access Container Shell
+```bash
+# Java app container
+docker exec -it bms-app sh
+
+# PostgreSQL container
+docker exec -it bms-postgres psql -U postgres -d bms
 ```
 
 ---
 
-## Production Note
+## Development vs Production
 
-For production, change the default password in:
-- `docker-compose.yml` (POSTGRES_PASSWORD)
-- `application.yml` (spring.datasource.password)
+### Development (Current Setup)
+- Uses local Docker volumes
+- Logs visible in console
+- Auto-rebuild on changes
 
+### Production Recommendations
+- Use Docker secrets for sensitive data
+- Add health checks
+- Use Docker Swarm or Kubernetes
+- Set up proper logging (ELK stack)
+- Use reverse proxy (Nginx)
+- Enable HTTPS
+
+---
+
+## Health Checks
+
+The app includes a health check endpoint:
+```bash
+curl http://localhost:8080/actuator/health
+```
+
+Note: You may need to add Spring Boot Actuator dependency for this to work.
+
+---
+
+## Next Steps
+
+1. **Add Actuator** (for health checks):
+   ```xml
+   <dependency>
+       <groupId>org.springframework.boot</groupId>
+       <artifactId>spring-boot-starter-actuator</artifactId>
+   </dependency>
+   ```
+
+2. **Add .env file** for sensitive configuration
+
+3. **Set up CI/CD** to build and deploy Docker images
+
+4. **Add monitoring** (Prometheus, Grafana)
+
+---
+
+**Happy Dockerizing! 🐳**

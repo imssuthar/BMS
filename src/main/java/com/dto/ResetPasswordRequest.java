@@ -10,12 +10,17 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class LoginRequest {
-    private String username;
+public class ResetPasswordRequest {
     @NotBlank
-    @Size(min = 4 , max = 30)
-    private String password;
     @Email
     private String email;
-    private String phone;
+    
+    @NotBlank
+    @Size(min = 6, max = 6, message = "Code must be 6 digits")
+    private String code;
+    
+    @NotBlank
+    @Size(min = 4, max = 30)
+    private String newPassword;
 }
+

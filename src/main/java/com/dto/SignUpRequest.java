@@ -10,12 +10,13 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class LoginRequest {
-    private String username;
+public class SignUpRequest {
     @NotBlank
-    @Size(min = 4 , max = 30)
+    @Size(min = 4, max = 30)
     private String password;
+    
+    @NotBlank
     @Email
     private String email;
-    private String phone;
 }
+
