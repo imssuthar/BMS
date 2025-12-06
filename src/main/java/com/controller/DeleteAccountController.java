@@ -1,6 +1,7 @@
 package com.controller;
 
 import com.dto.LoginResponse;
+import com.exception.UnauthorizedException;
 import com.service.DeleteAccountI;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -20,13 +21,14 @@ public class DeleteAccountController {
         
         // Extract token from "Bearer <token>" format
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.status(401).body("{\"respText\":\"Authorization token required\"}");
+            throw new UnauthorizedException("Authorization token required");
         }
         
         String token = authHeader.substring(7); // Remove "Bearer " prefix
         
+        // No try-catch needed - exceptions are handled by GlobalExceptionHandler
         LoginResponse resp = deleteAccountService.deleteAccount(token);
-        return ResponseEntity.status(resp.getStatusCode()).body(resp.getData());
+        return ResponseEntity.ok(resp.getData());
     }
 }
 

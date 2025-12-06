@@ -11,13 +11,15 @@ import org.springframework.web.bind.annotation.RestController;
 import com.dto.LoginRequest;
 import com.service.LoginI;
 
-@RestController()
+@RestController
 public class LoginController {
     @Autowired
     private LoginI loginService;
+    
     @PostMapping("/login")
-    public ResponseEntity login(@RequestBody @Valid LoginRequest loginRequest) {
-       LoginResponse resp =  loginService.login(loginRequest);
-       return ResponseEntity.status(resp.getStatusCode()).body(resp.getData());
+    public ResponseEntity<Object> login(@RequestBody @Valid LoginRequest loginRequest) {
+        // No try-catch needed - exceptions handled by GlobalExceptionHandler
+        LoginResponse resp = loginService.login(loginRequest);
+        return ResponseEntity.ok(resp.getData());
     }
 }

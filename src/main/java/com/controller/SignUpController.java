@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-@RestController()
+@RestController
 public class SignUpController {
     
     @Autowired
@@ -18,7 +18,8 @@ public class SignUpController {
     
     @PostMapping("/signup")
     public ResponseEntity<Object> signUp(@RequestBody @Valid SignUpRequest signUpRequest) {
+        // No try-catch needed - exceptions handled by GlobalExceptionHandler
         LoginResponse resp = signUpService.signUp(signUpRequest);
-        return ResponseEntity.status(resp.getStatusCode()).body(resp.getData());
+        return ResponseEntity.status(201).body(resp.getData()); // 201 Created for signup
     }
 }

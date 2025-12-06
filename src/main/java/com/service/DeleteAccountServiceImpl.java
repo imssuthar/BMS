@@ -1,6 +1,9 @@
 package com.service;
 
 import com.dto.LoginResponse;
+import com.exception.ForbiddenException;
+import com.exception.ResourceNotFoundException;
+import com.exception.UnauthorizedException;
 import com.model.User;
 import com.repository.UserRepository;
 import com.util.BodyJWT;
@@ -31,22 +34,18 @@ public class DeleteAccountServiceImpl implements DeleteAccountI {
         // Parse JWT token
         BodyJWT bodyJWT = JWT.parseToken(token);
         
-        // Validate token
+        // Validate token - throw exception instead of returning error response
         if (bodyJWT == null) {
-            return createErrorResponse(401, "Invalid or expired token");
+            throw new UnauthorizedException("Invalid or expired token");
         }
         
-        // Get user from database
+        // Get user from database - throw exception if not found
         User user = userRepository.findByEmail(bodyJWT.getEmail())
-                .orElse(null);
-        
-        if (user == null) {
-            return createErrorResponse(404, "User not found");
-        }
+                .orElseThrow(() -> new ResourceNotFoundException("User", bodyJWT.getEmail()));
         
         // Verify token userId matches user id (extra security check)
         if (!user.getId().equals(bodyJWT.getUserId())) {
-            return createErrorResponse(403, "Token does not match user account");
+            throw new ForbiddenException("Token does not match user account");
         }
         
         // Send account deletion confirmation email
@@ -66,28 +65,9 @@ public class DeleteAccountServiceImpl implements DeleteAccountI {
                     .data(jsonData)
                     .build();
         } catch (JsonProcessingException e) {
+            // This is a rare case - log and rethrow as runtime exception
             System.err.println("Error serializing response: " + e.getMessage());
-            return createErrorResponse(500, "Internal server error");
-        }
-    }
-    
-    // Helper method to avoid code duplication
-    private LoginResponse createErrorResponse(int statusCode, String message) {
-        Map<String, Object> errorData = new HashMap<>();
-        errorData.put("respText", message);
-        
-        try {
-            String jsonData = objectMapper.writeValueAsString(errorData);
-            return LoginResponse.builder()
-                    .statusCode(statusCode)
-                    .data(jsonData)
-                    .build();
-        } catch (JsonProcessingException e) {
-            System.err.println("Error serializing error response: " + e.getMessage());
-            return LoginResponse.builder()
-                    .statusCode(500)
-                    .data("{\"respText\":\"Internal server error\"}")
-                    .build();
+            throw new RuntimeException("Failed to serialize response", e);
         }
     }
 }

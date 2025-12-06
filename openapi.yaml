@@ -1,0 +1,598 @@
+openapi: 3.1.0
+info:
+  title: BookMyShow (BMS) API
+  description: |
+    RESTful API for BookMyShow - A movie ticket booking system.
+    
+    ## Authentication
+    Most endpoints require JWT authentication. Get your token by:
+    1. Register: `POST /signup`
+    2. Verify email: `POST /verify-email`
+    3. Login: `POST /login` → Receive JWT token
+    
+    Include the token in the `Authorization` header:
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+    
+    ## Error Handling
+    All errors follow a standardized format with `errorCode`, `message`, `statusCode`, `timestamp`, and `path`.
+  version: 1.0.0
+  contact:
+    name: BMS API Support
+    email: support@bookmyshow.com
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.bookmyshow.com
+    description: Production server (example)
+
+tags:
+  - name: Authentication
+    description: User authentication and account management
+  - name: User Management
+    description: User registration, verification, and account operations
+
+paths:
+  /signup:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: |
+        Creates a new user account. After registration, a verification code is sent to the user's email.
+        The user must verify their email before they can login.
+      operationId: signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignUpRequest'
+            examples:
+              example1:
+                summary: Register new user
+                value:
+                  email: user@example.com
+                  password: password123
+      responses:
+        '201':
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              examples:
+                success:
+                  value:
+                    respText: "Account created successfully. Please check your email for verification code."
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                validationError:
+                  value:
+                    errorCode: VALIDATION_ERROR
+                    message: "Email must be a valid email address"
+                    statusCode: 400
+                    timestamp: "2024-01-15T10:30:00"
+                    path: "/signup"
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                conflict:
+                  value:
+                    errorCode: CONFLICT
+                    message: "Email already exists"
+                    statusCode: 409
+                    timestamp: "2024-01-15T10:30:00"
+                    path: "/signup"
+
+  /verify-email:
+    post:
+      tags:
+        - Authentication
+      summary: Verify user email
+      description: |
+        Verifies the user's email address using the verification code sent during registration.
+        After successful verification, the user account is activated and they can login.
+      operationId: verifyEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEmailRequest'
+            examples:
+              example1:
+                summary: Verify email with code
+                value:
+                  email: user@example.com
+                  code: "123456"
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              examples:
+                success:
+                  value:
+                    respText: "Email verified successfully. Your account is now active!"
+        '400':
+          description: Validation error or invalid code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: |
+        Authenticates a user and returns a JWT token.
+        The user must have verified their email before they can login.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              example1:
+                summary: Login with email and password
+                value:
+                  email: user@example.com
+                  password: password123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              examples:
+                success:
+                  value:
+                    token: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyQGV4YW1wbGUuY29tIiwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwidXNlcklkIjoxLCJpYXQiOjE3MDUzMjE4MDAsImV4cCI6MTcwNTMyNTQwMH0.example"
+                    expiryEpoch: 1705325400000
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials or unverified account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  value:
+                    errorCode: UNAUTHORIZED
+                    message: "Invalid email or password or unverified account"
+                    statusCode: 401
+                    timestamp: "2024-01-15T10:30:00"
+                    path: "/login"
+
+  /forgot-password:
+    post:
+      tags:
+        - User Management
+      summary: Request password reset
+      description: |
+        Sends a verification code to the user's email for password reset.
+        The code expires in 10 minutes.
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+            examples:
+              example1:
+                summary: Request password reset
+                value:
+                  email: user@example.com
+      responses:
+        '200':
+          description: Verification code sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              examples:
+                success:
+                  value:
+                    respText: "Verification code sent to your email"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /verify-reset-code:
+    post:
+      tags:
+        - User Management
+      summary: Verify password reset code
+      description: |
+        Verifies the password reset code sent to the user's email.
+        The code must be used within 10 minutes of generation.
+      operationId: verifyResetCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyCodeRequest'
+            examples:
+              example1:
+                summary: Verify reset code
+                value:
+                  email: user@example.com
+                  code: "123456"
+      responses:
+        '200':
+          description: Code verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              examples:
+                success:
+                  value:
+                    respText: "Code verified successfully"
+        '400':
+          description: Invalid or expired code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidCode:
+                  value:
+                    errorCode: VALIDATION_ERROR
+                    message: "Invalid verification code"
+                    statusCode: 400
+                    timestamp: "2024-01-15T10:30:00"
+                    path: "/verify-reset-code"
+                expiredCode:
+                  value:
+                    errorCode: VALIDATION_ERROR
+                    message: "Verification code has expired. Please request a new code."
+                    statusCode: 400
+                    timestamp: "2024-01-15T10:30:00"
+                    path: "/verify-reset-code"
+
+  /reset-password:
+    post:
+      tags:
+        - User Management
+      summary: Reset user password
+      description: |
+        Resets the user's password using the verification code.
+        The code must be verified first using `/verify-reset-code`.
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+            examples:
+              example1:
+                summary: Reset password
+                value:
+                  email: user@example.com
+                  code: "123456"
+                  newPassword: "newpassword123"
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              examples:
+                success:
+                  value:
+                    respText: "Password reset successfully"
+        '400':
+          description: Invalid or expired code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /delete-account:
+    delete:
+      tags:
+        - User Management
+      summary: Delete user account
+      description: |
+        Permanently deletes the user account.
+        Requires JWT authentication. The token must match the account being deleted.
+      operationId: deleteAccount
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Account deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              examples:
+                success:
+                  value:
+                    respText: "Account deleted successfully"
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  value:
+                    errorCode: UNAUTHORIZED
+                    message: "Authorization token required"
+                    statusCode: 401
+                    timestamp: "2024-01-15T10:30:00"
+                    path: "/delete-account"
+        '403':
+          description: Token does not match user account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                forbidden:
+                  value:
+                    errorCode: FORBIDDEN
+                    message: "Token does not match user account"
+                    statusCode: 403
+                    timestamp: "2024-01-15T10:30:00"
+                    path: "/delete-account"
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token obtained from the `/login` endpoint.
+        Include the token in the Authorization header as: `Bearer <token>`
+
+  schemas:
+    SignUpRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address (must be unique)
+          examples:
+            - user@example.com
+        password:
+          type: string
+          minLength: 4
+          maxLength: 30
+          description: User's password (min 4, max 30 characters)
+          examples:
+            - password123
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          examples:
+            - user@example.com
+        password:
+          type: string
+          minLength: 4
+          maxLength: 30
+          description: User's password
+          examples:
+            - password123
+
+    ForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          examples:
+            - user@example.com
+
+    VerifyCodeRequest:
+      type: object
+      required:
+        - email
+        - code
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          examples:
+            - user@example.com
+        code:
+          type: string
+          minLength: 6
+          maxLength: 6
+          pattern: '^\d{6}$'
+          description: 6-digit verification code
+          examples:
+            - "123456"
+
+    VerifyEmailRequest:
+      type: object
+      required:
+        - email
+        - code
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          examples:
+            - user@example.com
+        code:
+          type: string
+          minLength: 6
+          maxLength: 6
+          pattern: '^\d{6}$'
+          description: 6-digit verification code sent to email
+          examples:
+            - "123456"
+
+    ResetPasswordRequest:
+      type: object
+      required:
+        - email
+        - code
+        - newPassword
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          examples:
+            - user@example.com
+        code:
+          type: string
+          minLength: 6
+          maxLength: 6
+          pattern: '^\d{6}$'
+          description: 6-digit verification code
+          examples:
+            - "123456"
+        newPassword:
+          type: string
+          minLength: 4
+          maxLength: 30
+          description: New password (min 4, max 30 characters)
+          examples:
+            - newpassword123
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT token for authentication
+          examples:
+            - "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyQGV4YW1wbGUuY29tIiwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwidXNlcklkIjoxLCJpYXQiOjE3MDUzMjE4MDAsImV4cCI6MTcwNTMyNTQwMH0.example"
+        expiryEpoch:
+          type: integer
+          format: int64
+          description: Token expiration time in milliseconds (Unix epoch)
+          examples:
+            - 1705325400000
+
+    SuccessResponse:
+      type: object
+      properties:
+        respText:
+          type: string
+          description: Success message
+          examples:
+            - "Operation completed successfully"
+
+    ErrorResponse:
+      type: object
+      properties:
+        errorCode:
+          type: string
+          description: Error code identifier
+          enum:
+            - RESOURCE_NOT_FOUND
+            - VALIDATION_ERROR
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - CONFLICT
+          examples:
+            - UNAUTHORIZED
+        message:
+          type: string
+          description: Human-readable error message
+          examples:
+            - "Invalid email or password"
+        statusCode:
+          type: integer
+          description: HTTP status code
+          examples:
+            - 401
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp when the error occurred
+          examples:
+            - "2024-01-15T10:30:00"
+        path:
+          type: string
+          description: API endpoint path that caused the error
+          examples:
+            - "/login"
+

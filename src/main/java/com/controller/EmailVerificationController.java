@@ -18,8 +18,9 @@ public class EmailVerificationController {
     
     @PostMapping("/verify-email")
     public ResponseEntity<Object> verifyEmail(@RequestBody @Valid VerifyEmailRequest request) {
+        // No try-catch needed - exceptions handled by GlobalExceptionHandler
         LoginResponse resp = emailVerificationService.verifyEmail(request);
-        return ResponseEntity.status(resp.getStatusCode()).body(resp.getData());
+        return ResponseEntity.ok(resp.getData());
     }
 }
 

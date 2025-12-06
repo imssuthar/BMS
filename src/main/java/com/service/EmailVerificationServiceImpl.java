@@ -2,6 +2,9 @@ package com.service;
 
 import com.dto.LoginResponse;
 import com.dto.VerifyEmailRequest;
+import com.exception.ConflictException;
+import com.exception.ResourceNotFoundException;
+import com.exception.ValidationException;
 import com.model.User;
 import com.repository.UserRepository;
 import com.util.EmailService;
@@ -36,15 +39,11 @@ public class EmailVerificationServiceImpl implements EmailVerificationI {
         
         // Check if user exists
         User user = userRepository.findByEmail(email)
-                .orElse(null);
-        
-        if (user == null) {
-            return createErrorResponse(404, "User not found");
-        }
+                .orElseThrow(() -> new ResourceNotFoundException("User", email));
         
         // Check if already verified
         if (Boolean.TRUE.equals(user.getVerified())) {
-            return createErrorResponse(400, "Email already verified");
+            throw new ConflictException("Email already verified");
         }
         
         // Get stored code info
@@ -52,18 +51,18 @@ public class EmailVerificationServiceImpl implements EmailVerificationI {
         
         // Check if code exists
         if (codeInfo == null) {
-            return createErrorResponse(400, "No verification code found. Please request a new code.");
+            throw new ValidationException("No verification code found. Please request a new code.");
         }
         
         // Check if code expired
         if (System.currentTimeMillis() > codeInfo.getExpiryTime()) {
             codeStorage.removeEmailVerificationCode(email); // Clean up expired code
-            return createErrorResponse(400, "Verification code has expired. Please request a new code.");
+            throw new ValidationException("Verification code has expired. Please request a new code.");
         }
         
         // Verify code
         if (!codeInfo.getCode().equals(providedCode)) {
-            return createErrorResponse(400, "Invalid verification code");
+            throw new ValidationException("Invalid verification code");
         }
         
         // Code is valid, mark email as verified
@@ -88,27 +87,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationI {
                     .build();
         } catch (JsonProcessingException e) {
             System.err.println("Error serializing response: " + e.getMessage());
-            return createErrorResponse(500, "Internal server error");
-        }
-    }
-    
-    // Helper method to avoid code duplication
-    private LoginResponse createErrorResponse(int statusCode, String message) {
-        Map<String, Object> errorData = new HashMap<>();
-        errorData.put("respText", message);
-        
-        try {
-            String jsonData = objectMapper.writeValueAsString(errorData);
-            return LoginResponse.builder()
-                    .statusCode(statusCode)
-                    .data(jsonData)
-                    .build();
-        } catch (JsonProcessingException e) {
-            System.err.println("Error serializing error response: " + e.getMessage());
-            return LoginResponse.builder()
-                    .statusCode(500)
-                    .data("{\"respText\":\"Internal server error\"}")
-                    .build();
+            throw new RuntimeException("Failed to serialize response", e);
         }
     }
 }

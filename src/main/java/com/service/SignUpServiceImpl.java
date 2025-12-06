@@ -2,6 +2,7 @@ package com.service;
 
 import com.dto.LoginResponse;
 import com.dto.SignUpRequest;
+import com.exception.ConflictException;
 import com.model.User;
 import com.repository.UserRepository;
 import com.util.EmailService;
@@ -37,7 +38,7 @@ public class SignUpServiceImpl implements SignUpI {
     public LoginResponse signUp(SignUpRequest req) {
         // Check if email already exists
         if (userRepository.findByEmail(req.getEmail()).isPresent()) {
-            return createErrorResponse(400, "Email already exists");
+            throw new ConflictException("Email", req.getEmail());
         }
         
         // Hash password
@@ -74,7 +75,7 @@ public class SignUpServiceImpl implements SignUpI {
                     .build();
         } catch (JsonProcessingException e) {
             System.err.println("Error serializing response: " + e.getMessage());
-            return createErrorResponse(500, "Internal server error");
+            throw new RuntimeException("Failed to serialize response", e);
         }
     }
     
@@ -83,26 +84,6 @@ public class SignUpServiceImpl implements SignUpI {
         Random random = new Random();
         int code = 100000 + random.nextInt(900000); // Generates 100000-999999
         return String.valueOf(code);
-    }
-    
-    // Helper method to avoid code duplication
-    private LoginResponse createErrorResponse(int statusCode, String message) {
-        Map<String, Object> errorData = new HashMap<>();
-        errorData.put("respText", message);
-        
-        try {
-            String jsonData = objectMapper.writeValueAsString(errorData);
-            return LoginResponse.builder()
-                    .statusCode(statusCode)
-                    .data(jsonData)
-                    .build();
-        } catch (JsonProcessingException e) {
-            System.err.println("Error serializing error response: " + e.getMessage());
-            return LoginResponse.builder()
-                    .statusCode(500)
-                    .data("{\"respText\":\"Internal server error\"}")
-                    .build();
-        }
     }
 }
 

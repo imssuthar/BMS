@@ -4,9 +4,12 @@ import com.dto.ForgotPasswordRequest;
 import com.dto.LoginResponse;
 import com.dto.ResetPasswordRequest;
 import com.dto.VerifyCodeRequest;
+import com.exception.ResourceNotFoundException;
+import com.exception.ValidationException;
 import com.model.User;
 import com.repository.UserRepository;
 import com.util.EmailService;
+import com.util.VerificationCodeStorage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -16,7 +19,6 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class ForgotPasswordServiceImpl implements ForgotPasswordI {
@@ -30,9 +32,8 @@ public class ForgotPasswordServiceImpl implements ForgotPasswordI {
     @Autowired
     private EmailService emailService;
     
-    // In-memory storage for verification codes: email -> {code, expiryTime}
-    // In production, use Redis or database for distributed systems
-    private final Map<String, CodeInfo> verificationCodes = new ConcurrentHashMap<>();
+    @Autowired
+    private VerificationCodeStorage codeStorage;
     
     private static final int CODE_EXPIRY_MINUTES = 10; // Code expires in 10 minutes
     
@@ -42,7 +43,7 @@ public class ForgotPasswordServiceImpl implements ForgotPasswordI {
         
         // Check if user exists
         if (userRepository.findByEmail(email).isEmpty()) {
-            return createErrorResponse(404, "Email not found");
+            throw new ResourceNotFoundException("User", email);
         }
         
         // Generate 6-digit verification code
@@ -50,7 +51,7 @@ public class ForgotPasswordServiceImpl implements ForgotPasswordI {
         
         // Store code with expiry time
         long expiryTime = System.currentTimeMillis() + (CODE_EXPIRY_MINUTES * 60 * 1000);
-        verificationCodes.put(email, new CodeInfo(code, expiryTime));
+        codeStorage.storePasswordResetCode(email, code, expiryTime);
         
         // Send email with code
         emailService.sendVerificationCode(email, code);
@@ -67,7 +68,7 @@ public class ForgotPasswordServiceImpl implements ForgotPasswordI {
                     .build();
         } catch (JsonProcessingException e) {
             System.err.println("Error serializing response: " + e.getMessage());
-            return createErrorResponse(500, "Internal server error");
+            throw new RuntimeException("Failed to serialize response", e);
         }
     }
     
@@ -76,22 +77,22 @@ public class ForgotPasswordServiceImpl implements ForgotPasswordI {
         String email = request.getEmail();
         String providedCode = request.getCode();
         
-        CodeInfo codeInfo = verificationCodes.get(email);
+        VerificationCodeStorage.CodeInfo codeInfo = codeStorage.getPasswordResetCode(email);
         
         // Check if code exists
         if (codeInfo == null) {
-            return createErrorResponse(400, "No verification code found. Please request a new code.");
+            throw new ValidationException("No verification code found. Please request a new code.");
         }
         
         // Check if code expired
         if (System.currentTimeMillis() > codeInfo.getExpiryTime()) {
-            verificationCodes.remove(email); // Clean up expired code
-            return createErrorResponse(400, "Verification code has expired. Please request a new code.");
+            codeStorage.removePasswordResetCode(email); // Clean up expired code
+            throw new ValidationException("Verification code has expired. Please request a new code.");
         }
         
         // Verify code
         if (!codeInfo.getCode().equals(providedCode)) {
-            return createErrorResponse(400, "Invalid verification code");
+            throw new ValidationException("Invalid verification code");
         }
         
         // Code is valid
@@ -106,7 +107,7 @@ public class ForgotPasswordServiceImpl implements ForgotPasswordI {
                     .build();
         } catch (JsonProcessingException e) {
             System.err.println("Error serializing response: " + e.getMessage());
-            return createErrorResponse(500, "Internal server error");
+            throw new RuntimeException("Failed to serialize response", e);
         }
     }
     
@@ -116,27 +117,27 @@ public class ForgotPasswordServiceImpl implements ForgotPasswordI {
         String providedCode = request.getCode();
         String newPassword = request.getNewPassword();
         
-        CodeInfo codeInfo = verificationCodes.get(email);
+        VerificationCodeStorage.CodeInfo codeInfo = codeStorage.getPasswordResetCode(email);
         
         // Check if code exists
         if (codeInfo == null) {
-            return createErrorResponse(400, "No verification code found. Please request a new code.");
+            throw new ValidationException("No verification code found. Please request a new code.");
         }
         
         // Check if code expired
         if (System.currentTimeMillis() > codeInfo.getExpiryTime()) {
-            verificationCodes.remove(email); // Clean up expired code
-            return createErrorResponse(400, "Verification code has expired. Please request a new code.");
+            codeStorage.removePasswordResetCode(email); // Clean up expired code
+            throw new ValidationException("Verification code has expired. Please request a new code.");
         }
         
         // Verify code
         if (!codeInfo.getCode().equals(providedCode)) {
-            return createErrorResponse(400, "Invalid verification code");
+            throw new ValidationException("Invalid verification code");
         }
         
         // Code is valid, reset password
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found")); // Should not happen
+                .orElseThrow(() -> new ResourceNotFoundException("User", email));
         
         // Hash new password
         String hashedPassword = DigestUtils.sha256Hex(newPassword);
@@ -146,7 +147,7 @@ public class ForgotPasswordServiceImpl implements ForgotPasswordI {
         userRepository.save(user);
         
         // Remove used code
-        verificationCodes.remove(email);
+        codeStorage.removePasswordResetCode(email);
         
         // Return success response
         Map<String, Object> responseData = new HashMap<>();
@@ -160,7 +161,7 @@ public class ForgotPasswordServiceImpl implements ForgotPasswordI {
                     .build();
         } catch (JsonProcessingException e) {
             System.err.println("Error serializing response: " + e.getMessage());
-            return createErrorResponse(500, "Internal server error");
+            throw new RuntimeException("Failed to serialize response", e);
         }
     }
     
@@ -169,45 +170,6 @@ public class ForgotPasswordServiceImpl implements ForgotPasswordI {
         Random random = new Random();
         int code = 100000 + random.nextInt(900000); // Generates 100000-999999
         return String.valueOf(code);
-    }
-    
-    // Helper method to avoid code duplication
-    private LoginResponse createErrorResponse(int statusCode, String message) {
-        Map<String, Object> errorData = new HashMap<>();
-        errorData.put("respText", message);
-        
-        try {
-            String jsonData = objectMapper.writeValueAsString(errorData);
-            return LoginResponse.builder()
-                    .statusCode(statusCode)
-                    .data(jsonData)
-                    .build();
-        } catch (JsonProcessingException e) {
-            System.err.println("Error serializing error response: " + e.getMessage());
-            return LoginResponse.builder()
-                    .statusCode(500)
-                    .data("{\"respText\":\"Internal server error\"}")
-                    .build();
-        }
-    }
-    
-    // Inner class to store code and expiry time
-    private static class CodeInfo {
-        private final String code;
-        private final long expiryTime;
-        
-        public CodeInfo(String code, long expiryTime) {
-            this.code = code;
-            this.expiryTime = expiryTime;
-        }
-        
-        public String getCode() {
-            return code;
-        }
-        
-        public long getExpiryTime() {
-            return expiryTime;
-        }
     }
 }
 

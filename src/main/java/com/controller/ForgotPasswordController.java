@@ -20,20 +20,23 @@ public class ForgotPasswordController {
     
     @PostMapping("/forgot-password")
     public ResponseEntity<Object> requestPasswordReset(@RequestBody @Valid ForgotPasswordRequest request) {
+        // No try-catch needed - exceptions handled by GlobalExceptionHandler
         LoginResponse resp = forgotPasswordService.requestPasswordReset(request);
-        return ResponseEntity.status(resp.getStatusCode()).body(resp.getData());
+        return ResponseEntity.ok(resp.getData());
     }
     
     @PostMapping("/verify-reset-code")
     public ResponseEntity<Object> verifyCode(@RequestBody @Valid VerifyCodeRequest request) {
+        // No try-catch needed - exceptions handled by GlobalExceptionHandler
         LoginResponse resp = forgotPasswordService.verifyCode(request);
-        return ResponseEntity.status(resp.getStatusCode()).body(resp.getData());
+        return ResponseEntity.ok(resp.getData());
     }
     
     @PostMapping("/reset-password")
     public ResponseEntity<Object> resetPassword(@RequestBody @Valid ResetPasswordRequest request) {
+        // No try-catch needed - exceptions handled by GlobalExceptionHandler
         LoginResponse resp = forgotPasswordService.resetPassword(request);
-        return ResponseEntity.status(resp.getStatusCode()).body(resp.getData());
+        return ResponseEntity.ok(resp.getData());
     }
 }
 
